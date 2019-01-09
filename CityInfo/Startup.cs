@@ -2,11 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using CityInfo.Abstractions;
+using CityInfo.Entities;
+using CityInfo.Mappers;
+using CityInfo.Models;
 using CityInfo.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Formatters;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -47,10 +52,20 @@ namespace CityInfo
 #else
             services.AddTransient<IMailServices, CloudMailService>();
 #endif
+            string connectionString = Startup.Configuaration["ConnectionStrings:DefaultConnection"];
+            services.AddDbContext<CityInfoContext>(o => o.UseSqlServer(connectionString));
+
+            //add service injection
+            services.AddScoped<ICityService, CityService>();
+            services.AddScoped<IPointOfInterestService, PointOfInterestService>();
+
+            //add mapper
+            services.AddScoped<IMapper<City, CitityWithOutPointsOfInterestDto>, CityMapper>();
+            services.AddScoped<IMapper<PointsOfInterest, PointOfInterestDto>, PointOfInterestMapper>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory, CityInfoContext dbContext)
         {
             loggerFactory.AddConsole();
 
@@ -62,12 +77,21 @@ namespace CityInfo
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
+
+                //seed Data in dev Mode
+                dbContext.SeedDataToCityInfoContext();
             }
             else {
                 app.UseExceptionHandler();
             }
             //send the status code to the client web page
             app.UseStatusCodePages();
+
+            //set automapper generic initialization
+            AutoMapper.Mapper.Initialize(c => {
+                c.CreateMap<CitityWithOutPointsOfInterestDto, City>();
+                c.CreateMap<PointOfInterestDto, PointsOfInterest>();
+            });
 
             app.UseMvc();
             //app.Run(async (context) =>

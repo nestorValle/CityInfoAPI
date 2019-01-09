@@ -1,4 +1,5 @@
-﻿using CityInfo.Models;
+﻿using CityInfo.Abstractions;
+using CityInfo.Models;
 using CityInfo.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -10,28 +11,36 @@ using System.Threading.Tasks;
 namespace CityInfo.Controllers
 {
     [Route("api/cities")]
-    public class PointsOfInterest: Controller
+    public class PointsOfInterestController: Controller
     {
-        private ILogger<PointsOfInterest> _logger;
-        private IMailServices _mailService;
-        public PointsOfInterest(ILogger<PointsOfInterest> logger, IMailServices mailService)
+        private readonly ILogger<PointsOfInterestController> _logger;
+        private readonly IMailServices _mailService;
+        private readonly IPointOfInterestService _pointOfInterestservice;
+        private readonly ICityService _cityService;
+
+        public PointsOfInterestController(
+            ILogger<PointsOfInterestController> logger, 
+            IMailServices mailService,
+            ICityService cityService,
+            IPointOfInterestService pointOfInterestservice)
         {
             _logger = logger;
             _mailService = mailService;
+            _pointOfInterestservice = pointOfInterestservice;
+            _cityService = cityService;
         }
 
         [HttpGet("{cityId}/pointofInterest")]
         public IActionResult getPointsOfInterest(int cityId) {
             try
             {
-                //throw new Exception("error in pointsOfInteres controller");
-
-                var city = CitiesDataStore.current.cities.FirstOrDefault(f => f.Id == cityId);
+                var city = _cityService.GetById(cityId);
                 if (city == null)
                 {
                     return NotFound();
                 }
-                return Ok(city.PointsOfInterest);
+                var pointsOfInterest = _pointOfInterestservice.GetPointsOfInterestByCity(cityId);
+                return Ok(pointsOfInterest);
             }
             catch (Exception ex)
             {
@@ -43,13 +52,8 @@ namespace CityInfo.Controllers
 
         [HttpGet("{cityId}/pointOfInterest/{id}", Name = "getPointOfInterestById")]
         public IActionResult getPointsOfInterestById(int cityId, int id) {
-            var city = CitiesDataStore.current.cities.FirstOrDefault(f => f.Id == cityId);
-            if (city == null)
-            {
-                return NotFound();
-            }
-
-            var pointOfInterest = city.PointsOfInterest.FirstOrDefault(p => p.Id.Equals(id));
+            
+            var pointOfInterest = _pointOfInterestservice.GetById(id);
             if (pointOfInterest == null)
             {
                 return NotFound();
@@ -72,22 +76,19 @@ namespace CityInfo.Controllers
             {
                 return BadRequest(ModelState);
             }
-            var existCity = CitiesDataStore.current.cities.FirstOrDefault(e => e.Id.Equals(cityId));
+            var existCity = _cityService.GetById(cityId);
             if (existCity == null)
             {
                 return NotFound();
             }
-            var nextIdPointOfInteres = existCity.PointsOfInterest.Max(m => m.Id) + 1;
-            var dto = new PointOfInterestDto()
-            {
-                Id = nextIdPointOfInteres,
+
+            int createdId = _pointOfInterestservice.Create(new PointOfInterestDto() {
                 Name = pointOfInterest.Name,
-                Description = pointOfInterest.Description
-            };
+                Description = pointOfInterest.Description,
+                CityId = cityId
+            });
 
-            existCity.PointsOfInterest.Add(dto);
-
-            return CreatedAtRoute("getPointOfInterestById", new { cityId= cityId, id=nextIdPointOfInteres}, dto);
+            return CreatedAtRoute("getPointOfInterestById", new { cityId= cityId, id= createdId }, pointOfInterest);
         }
 
         [HttpPut("{cityId}/pointOfinterest/{id}")]
@@ -105,38 +106,43 @@ namespace CityInfo.Controllers
             {
                 return BadRequest(ModelState);
             }
-            var existCity = CitiesDataStore.current.cities.FirstOrDefault(e => e.Id.Equals(cityId));
+            var existCity = _cityService.GetById(cityId, true);
             if (existCity == null)
             {
                 return NotFound();
             }
-            var dto = existCity.PointsOfInterest.FirstOrDefault(p => p.Id.Equals(id));
-            if (dto == null)
+
+            var existPointOfInterest = _pointOfInterestservice.GetById(id, true);
+            if (existPointOfInterest == null)
             {
                 return NotFound();
             }
 
-            dto.Name = pointOfInterest.Name;
-            dto.Description = pointOfInterest.Description;
+            var updatePoint = new PointOfInterestDto() {
+                Id = existPointOfInterest.Id,
+                CityId = cityId,
+                Name = pointOfInterest.Name,
+                Description = pointOfInterest.Description
+            };
+            _pointOfInterestservice.Update(updatePoint);
 
             return NoContent();
         }
 
         [HttpDelete("{cityId}/pointOfinterest/{id}")]
         public IActionResult DeletePointOfInteres(int cityId, int id) {
-            var city = CitiesDataStore.current.cities.FirstOrDefault(f => f.Id == cityId);
+            var city = _cityService.GetById(cityId, true);
             if (city == null)
             {
                 return NotFound();
             }
 
-            var pointOfInterest = city.PointsOfInterest.FirstOrDefault(p => p.Id.Equals(id));
+            var pointOfInterest = _pointOfInterestservice.GetById(id, true);
             if (pointOfInterest == null)
             {
                 return NotFound();
             }
-            city.PointsOfInterest.Remove(pointOfInterest);
-
+            _pointOfInterestservice.Delete(id);
             _mailService
                 .Send(
                 $"Delete point if interest from city {city}", 

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CityInfo.Abstractions;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -7,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace CityInfo.Entities
 {
-    public class PointsOfInterest
+    public class PointsOfInterest: IEntity
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
