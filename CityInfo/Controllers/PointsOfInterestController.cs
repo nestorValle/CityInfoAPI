@@ -1,6 +1,8 @@
 ﻿using CityInfo.Abstractions;
 using CityInfo.Models;
 using CityInfo.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System;
@@ -31,9 +33,11 @@ namespace CityInfo.Controllers
         }
 
         [HttpGet("{cityId}/pointofInterest")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public IActionResult getPointsOfInterest(int cityId) {
             try
             {
+                var user = User.Claims;
                 var city = _cityService.GetById(cityId);
                 if (city == null)
                 {

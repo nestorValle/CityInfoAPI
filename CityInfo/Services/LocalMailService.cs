@@ -8,8 +8,8 @@ namespace CityInfo.Services
 {
     public class LocalMailService : IMailServices
     {
-        public string From = Startup.Configuaration["mailSettings:mailFromAddress"];
-        public string To = Startup.Configuaration["mailSettings:mailToAddress"];
+        public string From = Startup.Configuration["mailSettings:mailFromAddress"];
+        public string To = Startup.Configuration["mailSettings:mailToAddress"];
 
         public void Send(string subject, string message)
         {

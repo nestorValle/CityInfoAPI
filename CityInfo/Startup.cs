@@ -1,20 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using CityInfo.Abstractions;
 using CityInfo.Entities;
 using CityInfo.Mappers;
 using CityInfo.Models;
 using CityInfo.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Serialization;
 using NLog.Extensions.Logging;
 
@@ -22,7 +26,7 @@ namespace CityInfo
 {
     public class Startup
     {
-        public static IConfiguration Configuaration { get; set; }
+        public static IConfiguration Configuration { get; set; }
 
         public Startup(IHostingEnvironment env)
         {
@@ -32,7 +36,7 @@ namespace CityInfo
                 .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true, reloadOnChange: true)
                 .AddEnvironmentVariables();
 
-            Configuaration = builder.Build();
+            Configuration = builder.Build();
         }
         // This method gets called by the runtime. Use this method to add services to the container.
         // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
@@ -52,8 +56,29 @@ namespace CityInfo
 #else
             services.AddTransient<IMailServices, CloudMailService>();
 #endif
-            string connectionString = Startup.Configuaration["ConnectionStrings:DefaultConnection"];
+            string connectionString = Startup.Configuration["ConnectionStrings:DefaultConnection"];
             services.AddDbContext<CityInfoContext>(o => o.UseSqlServer(connectionString));
+
+            services.AddIdentity<ApplicationUser, IdentityRole>(conf=> {
+                conf.User.RequireUniqueEmail = true;
+            })
+            .AddEntityFrameworkStores<CityInfoContext>()
+            .AddDefaultTokenProviders();
+
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                 options.TokenValidationParameters = new TokenValidationParameters
+                 {
+                     ValidateIssuer = true,
+                     ValidateAudience = true,
+                     ValidateLifetime = true,
+                     ValidateIssuerSigningKey = true,
+                     ValidIssuer = "yourdomain.com",
+                     ValidAudience = "yourdomain.com",
+                     IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(Configuration["Llave_super_secreta"])),
+                     ClockSkew = TimeSpan.Zero
+                 });
 
             //add service injection
             services.AddScoped<ICityService, CityService>();
@@ -88,10 +113,13 @@ namespace CityInfo
             app.UseStatusCodePages();
 
             //set automapper generic initialization
-            AutoMapper.Mapper.Initialize(c => {
-                c.CreateMap<CitityWithOutPointsOfInterestDto, City>();
-                c.CreateMap<PointOfInterestDto, PointsOfInterest>();
-            });
+            //AutoMapper.Mapper.Initialize(c => {
+            //    c.CreateMap<CitityWithOutPointsOfInterestDto, City>();
+            //    c.CreateMap<PointOfInterestDto, PointsOfInterest>();
+            //});
+            app.AutoMapperInitialize();
+
+            app.UseAuthentication();
 
             app.UseMvc();
             //app.Run(async (context) =>

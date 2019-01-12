@@ -12,6 +12,7 @@
       "commandName": "IISExpress",
       "launchBrowser": true,
       "environmentVariables": {
+        "Llave_super_secreta": "esta es una llave super secreta",
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
